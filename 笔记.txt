@@ -5,3 +5,6 @@ RocketMQ学习笔记
 
 一、quick start
 见example/src/main/java/org/apache/rocketmq/example/my/quick_start.txt
+
+二、producer发送消息
+发送使用的是org.apache.rocketmq.client.producer.DefaultMQProducer.send(org.apache.rocketmq.common.message.Message)

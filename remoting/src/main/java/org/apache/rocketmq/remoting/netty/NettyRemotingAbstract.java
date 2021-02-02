@@ -60,6 +60,7 @@ public abstract class NettyRemotingAbstract {
     private static final InternalLogger log = InternalLoggerFactory.getLogger(RemotingHelper.ROCKETMQ_REMOTING);
 
     /**
+     * 信号量可限制正在进行的单向请求的最大数量，从而保护系统内存占用。
      * Semaphore to limit maximum number of on-going one-way requests, which protects system memory footprint.
      */
     protected final Semaphore semaphoreOneway;
@@ -404,34 +405,47 @@ public abstract class NettyRemotingAbstract {
         }
     }
 
+    /**
+     * 同步将msg写到broker
+     * @param channel channel
+     * @param request request
+     * @param timeoutMillis 超时时间
+     * @return
+     * @throws InterruptedException
+     * @throws RemotingSendRequestException
+     * @throws RemotingTimeoutException
+     */
     public RemotingCommand invokeSyncImpl(final Channel channel, final RemotingCommand request,
         final long timeoutMillis)
         throws InterruptedException, RemotingSendRequestException, RemotingTimeoutException {
-        final int opaque = request.getOpaque();
+        final int opaque = request.getOpaque();//缓存在发送中的请求的key？
 
         try {
-            final ResponseFuture responseFuture = new ResponseFuture(channel, opaque, timeoutMillis, null, null);
-            this.responseTable.put(opaque, responseFuture);
+            final ResponseFuture responseFuture = new ResponseFuture(channel, opaque, timeoutMillis, null, null);//channel wrapper到一个ResponseFuture钟
+            this.responseTable.put(opaque, responseFuture);//将当前channel的请求放入等待中的map中
             final SocketAddress addr = channel.remoteAddress();
-            channel.writeAndFlush(request).addListener(new ChannelFutureListener() {
-                @Override
-                public void operationComplete(ChannelFuture f) throws Exception {
-                    if (f.isSuccess()) {
-                        responseFuture.setSendRequestOK(true);
-                        return;
-                    } else {
-                        responseFuture.setSendRequestOK(false);
-                    }
+            //request写入channel并flush
+            channel.writeAndFlush(request).addListener((ChannelFutureListener) f -> {
 
-                    responseTable.remove(opaque);
-                    responseFuture.setCause(f.cause());
-                    responseFuture.putResponse(null);
-                    log.warn("send a request command to channel <" + addr + "> failed.");
+                //成功
+                if (f.isSuccess()) {
+                    responseFuture.setSendRequestOK(true);
+                    return;
                 }
+
+                //失败
+                responseFuture.setSendRequestOK(false);
+                responseTable.remove(opaque);
+                responseFuture.setCause(f.cause());
+                responseFuture.putResponse(null);
+                log.warn("send a request command to channel <" + addr + "> failed.");
+
             });
 
+            //countDownLatch(1)阻塞等待，拿到response
             RemotingCommand responseCommand = responseFuture.waitResponse(timeoutMillis);
             if (null == responseCommand) {
+                //responseCommand == null 直接抛异常
                 if (responseFuture.isSendRequestOK()) {
                     throw new RemotingTimeoutException(RemotingHelper.parseSocketAddressAddr(addr), timeoutMillis,
                         responseFuture.getCause());
@@ -439,9 +453,10 @@ public abstract class NettyRemotingAbstract {
                     throw new RemotingSendRequestException(RemotingHelper.parseSocketAddressAddr(addr), responseFuture.getCause());
                 }
             }
-
+            //responseCommand不为空返回
             return responseCommand;
         } finally {
+            //清空等待中的ResponseFuture
             this.responseTable.remove(opaque);
         }
     }
@@ -529,34 +544,43 @@ public abstract class NettyRemotingAbstract {
 
     public void invokeOnewayImpl(final Channel channel, final RemotingCommand request, final long timeoutMillis)
         throws InterruptedException, RemotingTooMuchRequestException, RemotingTimeoutException, RemotingSendRequestException {
+        //请求flag标记为oneway的rpc
         request.markOnewayRPC();
+        //使用信号量对oneway-rpc请求进行限流 通过nettyServerConfig.getServerOnewaySemaphoreValue()配置并行的rpc请求数，等待timeoutMillis毫米
         boolean acquired = this.semaphoreOneway.tryAcquire(timeoutMillis, TimeUnit.MILLISECONDS);
+
         if (acquired) {
+            //如果资源获取成功(目前并行的请求数少于semaphoreOneway最大量)，执行rpc
             final SemaphoreReleaseOnlyOnce once = new SemaphoreReleaseOnlyOnce(this.semaphoreOneway);
             try {
-                channel.writeAndFlush(request).addListener(new ChannelFutureListener() {
-                    @Override
-                    public void operationComplete(ChannelFuture f) throws Exception {
-                        once.release();
-                        if (!f.isSuccess()) {
-                            log.warn("send a request command to channel <" + channel.remoteAddress() + "> failed.");
-                        }
+                // request写入channel并flush
+                channel.writeAndFlush(request).addListener((ChannelFutureListener) f -> {
+                    //传入一个调用成功的回调函数释放信号量，因为执行channel写入的线程和当前的主线程是两个线程，且两个线程的关系是异步的，所有不能再当前主线程的finally中释放信号量
+                    once.release();
+                    if (!f.isSuccess()) {
+                        //未成功打印日志
+                        log.warn("send a request command to channel <" + channel.remoteAddress() + "> failed.");
                     }
                 });
             } catch (Exception e) {
+                //抛异常释放信号量、记录异常信息并将异常再次向上抛出
                 once.release();
                 log.warn("write send a request command to channel <" + channel.remoteAddress() + "> failed.");
                 throw new RemotingSendRequestException(RemotingHelper.parseChannelRemoteAddr(channel), e);
             }
         } else {
+            //如果获取失败
             if (timeoutMillis <= 0) {
+                //TODO org.apache.rocketmq.client.impl.MQClientAPIImpl.sendMessage中对oneway类型的请求未加发送超时判断，所以到这里的timeoutMillis可能为非正整数
+                // 即未做RemotingTooMuchRequestException("sendMessage call timeout")异常的抛出，为什么要这么处理，而且不提示超时反而提示执行太快呢？
                 throw new RemotingTooMuchRequestException("invokeOnewayImpl invoke too fast");
             } else {
+                //在timeoutMillis内获取锁超时了
                 String info = String.format(
-                    "invokeOnewayImpl tryAcquire semaphore timeout, %dms, waiting thread nums: %d semaphoreAsyncValue: %d",
-                    timeoutMillis,
-                    this.semaphoreOneway.getQueueLength(),
-                    this.semaphoreOneway.availablePermits()
+                        "invokeOnewayImpl tryAcquire semaphore timeout, %dms, waiting thread nums: %d semaphoreAsyncValue: %d",
+                        timeoutMillis,
+                        this.semaphoreOneway.getQueueLength(),
+                        this.semaphoreOneway.availablePermits()
                 );
                 log.warn(info);
                 throw new RemotingTimeoutException(info);

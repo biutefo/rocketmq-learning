@@ -303,25 +303,16 @@ public class DefaultMQProducer extends ClientConfig implements MQProducer {
     }
 
     /**
-     * Send message in synchronous mode. This method returns only when the sending procedure totally completes. </p>
-     *
-     * <strong>Warn:</strong> this method has internal retry-mechanism, that is, internal implementation will retry
-     * {@link #retryTimesWhenSendFailed} times before claiming failure. As a result, multiple messages may potentially
-     * delivered to broker(s). It's up to the application developers to resolve potential duplication issue.
-     *
-     * @param msg Message to send.
-     * @return {@link SendResult} instance to inform senders details of the deliverable, say Message ID of the message,
-     * {@link SendStatus} indicating broker storage/replication status, message queue sent to, etc.
-     * @throws MQClientException if there is any client error.
-     * @throws RemotingException if there is any network-tier error.
-     * @throws MQBrokerException if there is any error with broker.
-     * @throws InterruptedException if the sending thread is interrupted.
+     * 同步(CommunicationMode.SYNC)发送消息，该方法会阻塞知道消息发送成功。
      */
     @Override
     public SendResult send(
         Message msg) throws MQClientException, RemotingException, MQBrokerException, InterruptedException {
+        //先执行topic格式和长度校验、消息长度校验校验(空或过长)
         Validators.checkMessage(msg, this);
+        //给消息添加名称空间，适配重试消息和死信消息 [%RETRY%/%DLQ%]%namespace%origin_topic
         msg.setTopic(withNamespace(msg.getTopic()));
+        //调用具体实现
         return this.defaultMQProducerImpl.send(msg);
     }
 

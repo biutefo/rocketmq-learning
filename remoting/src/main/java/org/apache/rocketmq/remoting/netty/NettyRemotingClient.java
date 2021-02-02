@@ -365,16 +365,24 @@ public class NettyRemotingClient extends NettyRemotingAbstract implements Remoti
     @Override
     public RemotingCommand invokeSync(String addr, final RemotingCommand request, long timeoutMillis)
         throws InterruptedException, RemotingConnectException, RemotingSendRequestException, RemotingTimeoutException {
-        long beginStartTime = System.currentTimeMillis();
-        final Channel channel = this.getAndCreateChannel(addr);
-        if (channel != null && channel.isActive()) {
+        long beginStartTime = System.currentTimeMillis();//开始时间
+        final Channel channel = this.getAndCreateChannel(addr);//根据brokerAddr获取channel
+        if (channel != null && channel.isActive()) {//channel可用
             try {
+
+                //执行rpc前的钩子函数
                 doBeforeRpcHooks(addr, request);
+
+                //超时校验
                 long costTime = System.currentTimeMillis() - beginStartTime;
                 if (timeoutMillis < costTime) {
                     throw new RemotingTimeoutException("invokeSync call timeout");
                 }
+
+                //执行rpc
                 RemotingCommand response = this.invokeSyncImpl(channel, request, timeoutMillis - costTime);
+
+                //执行rpc后的钩子函数
                 doAfterRpcHooks(RemotingHelper.parseChannelRemoteAddr(channel), request, response);
                 return response;
             } catch (RemotingSendRequestException e) {
@@ -389,7 +397,7 @@ public class NettyRemotingClient extends NettyRemotingAbstract implements Remoti
                 log.warn("invokeSync: wait response timeout exception, the channel[{}]", addr);
                 throw e;
             }
-        } else {
+        } else {//不可用关闭并抛出异常
             this.closeChannel(addr, channel);
             throw new RemotingConnectException(addr);
         }
@@ -539,10 +547,12 @@ public class NettyRemotingClient extends NettyRemotingAbstract implements Remoti
     @Override
     public void invokeOneway(String addr, RemotingCommand request, long timeoutMillis) throws InterruptedException,
         RemotingConnectException, RemotingTooMuchRequestException, RemotingTimeoutException, RemotingSendRequestException {
-        final Channel channel = this.getAndCreateChannel(addr);
-        if (channel != null && channel.isActive()) {
+        final Channel channel = this.getAndCreateChannel(addr);//通过broker地址获取channel
+        if (channel != null && channel.isActive()) {//channel可用
             try {
+                //执行rpc前的钩子函数
                 doBeforeRpcHooks(addr, request);
+                //发送oneway请求
                 this.invokeOnewayImpl(channel, request, timeoutMillis);
             } catch (RemotingSendRequestException e) {
                 log.warn("invokeOneway: send request exception, so close the channel[{}]", addr);
@@ -550,6 +560,7 @@ public class NettyRemotingClient extends NettyRemotingAbstract implements Remoti
                 throw e;
             }
         } else {
+            //channel不可用，尝试关闭并抛出异常
             this.closeChannel(addr, channel);
             throw new RemotingConnectException(addr);
         }
