@@ -1,1 +1,7 @@
 RocketMQ学习笔记
+
+①所有测试用例放在example模块的org.apache.rocketmq.example.my包下
+②记录一下阅读源码过程中自己的理解并给出中文注释
+
+一、quick start
+见example/src/main/java/org/apache/rocketmq/example/my/quick_start.txt

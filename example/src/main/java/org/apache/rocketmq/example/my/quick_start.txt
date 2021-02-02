@@ -1,0 +1,56 @@
+RocketMQ学习笔记
+
+
+①所有测试用例放在example模块的org.apache.rocketmq.example.my包下
+②记录一下阅读源码过程中自己的理解并给出中文注释
+
+一、启动nameserver
+1.参考org.apache.rocketmq.namesrv.NameServerInstanceTest.startup添加org.apache.rocketmq.example.my.nameserver.NameServerStartMain
+2.执行main函数可以看到控制台输出
+12:02:52.558 [NettyEventExecutor] INFO  RocketmqRemoting - NettyEventExecutor service started
+12:02:52.559 [FileWatchService] INFO  RocketmqCommon - FileWatchService service started
+表示nameserver启动成功
+3.终端连接localhost的9876端口
+weidiandeMacBook-Pro:rocketmq-learning weidian$ telnet 127.0.0.1 9876
+Trying 127.0.0.1...
+Connected to localhost.
+Escape character is '^]'.
+^]
+Connection closed by foreign host.
+
+二、启动mqbroker（需要先启动nameserver）
+1.参考org.apache.rocketmq.broker.BrokerControllerTest.testBrokerRestart添加org.apache.rocketmq.example.my.nameserver.NameServerStartMain
+2.执行main函数可以看到控制台输出
+success
+3.终端连接localhost的10911端口
+telnet 127.0.0.1 10911
+weidiandeMacBook-Pro:rocketmq-learning weidian$ telnet 127.0.0.1 10911
+Trying 127.0.0.1...
+Connected to localhost.
+Escape character is '^]'.
+^]
+Connection closed by foreign host.
+
+三、启动producer
+1.从org.apache.rocketmq.example.quickstart.Producer拷贝一份org.apache.rocketmq.example.my.producer.MyProducer并指明nameserver
+2.执行main函数可以看到控制台输出
+......
+SendResult [sendStatus=SEND_OK, msgId=AC131F280C9918B4AAC2080C4A2F03E3, offsetMsgId=AC131F2800002A9F0000000000031493, messageQueue=MessageQueue [topic=TopicTest, brokerName=broker-a, queueId=3], queueOffset=248]
+SendResult [sendStatus=SEND_OK, msgId=AC131F280C9918B4AAC2080C4A3003E4, offsetMsgId=AC131F2800002A9F000000000003155E, messageQueue=MessageQueue [topic=TopicTest, brokerName=broker-a, queueId=0], queueOffset=249]
+SendResult [sendStatus=SEND_OK, msgId=AC131F280C9918B4AAC2080C4A3103E5, offsetMsgId=AC131F2800002A9F0000000000031629, messageQueue=MessageQueue [topic=TopicTest, brokerName=broker-a, queueId=1], queueOffset=249]
+SendResult [sendStatus=SEND_OK, msgId=AC131F280C9918B4AAC2080C4A3103E6, offsetMsgId=AC131F2800002A9F00000000000316F4, messageQueue=MessageQueue [topic=TopicTest, brokerName=broker-a, queueId=2], queueOffset=249]
+SendResult [sendStatus=SEND_OK, msgId=AC131F280C9918B4AAC2080C4A3203E7, offsetMsgId=AC131F2800002A9F00000000000317BF, messageQueue=MessageQueue [topic=TopicTest, brokerName=broker-a, queueId=3], queueOffset=249]
+13:30:23.167 [NettyClientSelector_1] INFO  RocketmqRemoting - closeChannel: close the connection to remote address[127.0.0.1:9876] result: true
+13:30:23.168 [NettyClientSelector_1] INFO  RocketmqRemoting - closeChannel: close the connection to remote address[172.19.31.40:10911] result: true
+
+四、启动consumer
+1.从org.apache.rocketmq.example.quickstart.Consumer拷贝一份org.apache.rocketmq.example.my.producer.MyProducer并指明nameserver
+2.执行main函数可以看到控制台输出
+13:38:29.018 [main] DEBUG i.n.u.i.l.InternalLoggerFactory - Using SLF4J as the default logging framework
+Consumer Started.
+ConsumeMessageThread_11 Receive New Messages: [MessageExt [brokerName=broker-a, queueId=0, storeSize=201, queueOffset=2, sysFlag=0, bornTimestamp=1612243821340, bornHost=/172.19.31.40:53414, storeTimestamp=1612243821341, storeHost=/172.19.31.40:10911, msgId=AC131F2800002A9F0000000000000648, commitLogOffset=1608, bodyCRC=710410109, reconsumeTimes=0, preparedTransactionOffset=0, toString()=Message{topic='TopicTest', flag=0, properties={MIN_OFFSET=0, MAX_OFFSET=250, CONSUME_START_TIME=1612244309676, UNIQ_KEY=AC131F280C9918B4AAC2080C431C0008, CLUSTER=DefaultCluster, WAIT=true, TAGS=TagA}, body=[72, 101, 108, 108, 111, 32, 82, 111, 99, 107, 101, 116, 77, 81, 32, 56], transactionId='null'}]]
+ConsumeMessageThread_14 Receive New Messages: [MessageExt [brokerName=broker-a, queueId=3, storeSize=202, queueOffset=3, sysFlag=0, bornTimestamp=1612243821357, bornHost=/172.19.31.40:53414, storeTimestamp=1612243821358, storeHost=/172.19.31.40:10911, msgId=AC131F2800002A9F0000000000000BCC, commitLogOffset=3020, bodyCRC=2079181465, reconsumeTimes=0, preparedTransactionOffset=0, toString()=Message{topic='TopicTest', flag=0, properties={MIN_OFFSET=0, MAX_OFFSET=250, CONSUME_START_TIME=1612244309677, UNIQ_KEY=AC131F280C9918B4AAC2080C432D000F, CLUSTER=DefaultCluster, WAIT=true, TAGS=TagA}, body=[72, 101, 108, 108, 111, 32, 82, 111, 99, 107, 101, 116, 77, 81, 32, 49, 53], transactionId='null'}]]
+ConsumeMessageThread_15 Receive New Messages: [MessageExt [brokerName=broker-a, queueId=1, storeSize=202, queueOffset=3, sysFlag=0, bornTimestamp=1612243821350, bornHost=/172.19.31.40:53414, storeTimestamp=1612243821352, storeHost=/172.19.31.40:10911, msgId=AC131F2800002A9F0000000000000A38, commitLogOffset=2616, bodyCRC=311324588, reconsumeTimes=0, preparedTransactionOffset=0, toString()=Message{topic='TopicTest', flag=0, properties={MIN_OFFSET=0, MAX_OFFSET=250, CONSUME_START_TIME=1612244309677, UNIQ_KEY=AC131F280C9918B4AAC2080C4326000D, CLUSTER=DefaultCluster, WAIT=true, TAGS=TagA}, body=[72, 101, 108, 108, 111, 32, 82, 111, 99, 107, 101, 116, 77, 81, 32, 49, 51], transactionId='null'}]]
+ConsumeMessageThread_9 Receive New Messages: [MessageExt [brokerName=broker-a, queueId=1, storeSize=201, queueOffset=2, sysFlag=0, bornTimestamp=1612243821342, bornHost=/172.19.31.40:53414, storeTimestamp=1612243821343, storeHost=/172.19.31.40:10911, msgId=AC131F2800002A9F0000000000000711, commitLogOffset=1809, bodyCRC=1565577195, reconsumeTimes=0, preparedTransactionOffset=0, toString()=Message{topic='TopicTest', flag=0, properties={MIN_OFFSET=0, MAX_OFFSET=250, CONSUME_START_TIME=1612244309677, UNIQ_KEY=AC131F280C9918B4AAC2080C431E0009, CLUSTER=DefaultCluster, WAIT=true, TAGS=TagA}, body=[72, 101, 108, 108, 111, 32, 82, 111, 99, 107, 101, 116, 77, 81, 32, 57], transactionId='null'}]]
+ConsumeMessageThread_8 Receive New Messages: [MessageExt [brokerName=broker-a, queueId=0, storeSize=201, queueOffset=1, sysFlag=0, bornTimestamp=1612243821332, bornHost=/172.19.31.40:53414, storeTimestamp=1612243821333, storeHost=/172.19.31.40:10911, msgId=AC131F2800002A9F0000000000000324, commitLogOffset=804, bodyCRC=601994070, reconsumeTimes=0, preparedTransactionOffset=0, toString()=Message{topic='TopicTest', flag=0, properties={MIN_OFFSET=0, MAX_OFFSET=250, CONSUME_START_TIME=1612244309677, UNIQ_KEY=AC131F280C9918B4AAC2080C43140004, CLUSTER=DefaultCluster, WAIT=true, TAGS=TagA}, body=[72, 101, 108, 108, 111, 32, 82, 111, 99, 107, 101, 116, 77, 81, 32, 52], transactionId='null'}]]
+......
