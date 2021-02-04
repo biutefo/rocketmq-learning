@@ -125,7 +125,7 @@ public class DefaultMessageStore implements MessageStore {
         this.messageStoreConfig = messageStoreConfig;
         this.brokerStatsManager = brokerStatsManager;
         this.allocateMappedFileService = new AllocateMappedFileService(this);
-        if (messageStoreConfig.isEnableDLegerCommitLog()) {
+        if (messageStoreConfig.isEnableDLegerCommitLog()) {//是否启用 DLedger，即是否启用 RocketMQ 主从切换，默认值为 false。如果需要开启主从切换，则该值需要设置为 true 。
             this.commitLog = new DLedgerCommitLog(this);
         } else {
             this.commitLog = new CommitLog(this);
@@ -415,34 +415,41 @@ public class DefaultMessageStore implements MessageStore {
 
     @Override
     public CompletableFuture<PutMessageResult> asyncPutMessage(MessageExtBrokerInner msg) {
+
+        // 一些messageStore校验：是否正常、是否为master、是否可写、页缓存是否忙
         PutMessageStatus checkStoreStatus = this.checkStoreStatus();
         if (checkStoreStatus != PutMessageStatus.PUT_OK) {
             return CompletableFuture.completedFuture(new PutMessageResult(checkStoreStatus, null));
         }
 
+
+        // 消息校验：topic长度和properties长度校验
         PutMessageStatus msgCheckStatus = this.checkMessage(msg);
         if (msgCheckStatus == PutMessageStatus.MESSAGE_ILLEGAL) {
             return CompletableFuture.completedFuture(new PutMessageResult(msgCheckStatus, null));
         }
 
-        long beginTime = this.getSystemClock().now();
+        long beginTime = this.getSystemClock().now();//存储开始时间
+        //是否启用 DLedger，即是否启用 RocketMQ 主从切换，默认值为 false。如果需要开启主从切换，则该值需要设置为 true 。 如果未开启，则对应CommitLog实现，此处以CommitLog为例继续深入分析
         CompletableFuture<PutMessageResult> putResultFuture = this.commitLog.asyncPutMessage(msg);
 
         putResultFuture.thenAccept((result) -> {
-            long elapsedTime = this.getSystemClock().now() - beginTime;
-            if (elapsedTime > 500) {
+            long elapsedTime = this.getSystemClock().now() - beginTime;//future结束回调时间
+            if (elapsedTime > 500) {//时长warning日志
                 log.warn("putMessage not in lock elapsed time(ms)={}, bodyLength={}", elapsedTime, msg.getBody().length);
             }
-            this.storeStatsService.setPutMessageEntireTimeMax(elapsedTime);
+            this.storeStatsService.setPutMessageEntireTimeMax(elapsedTime);//统计每一段put操作时间区间的次数
 
             if (null == result || !result.isOk()) {
-                this.storeStatsService.getPutMessageFailedTimes().incrementAndGet();
+                this.storeStatsService.getPutMessageFailedTimes().incrementAndGet();//累加失败次数
             }
         });
 
+        //直接返回future主线程结束
         return putResultFuture;
     }
 
+    @Override
     public CompletableFuture<PutMessageResult> asyncPutMessages(MessageExtBatch messageExtBatch) {
         PutMessageStatus checkStoreStatus = this.checkStoreStatus();
         if (checkStoreStatus != PutMessageStatus.PUT_OK) {
@@ -755,6 +762,7 @@ public class DefaultMessageStore implements MessageStore {
         return 0;
     }
 
+    @Override
     public long getOffsetInQueueByTime(String topic, int queueId, long timestamp) {
         ConsumeQueue logic = this.findConsumeQueue(topic, queueId);
         if (logic != null) {
@@ -764,13 +772,14 @@ public class DefaultMessageStore implements MessageStore {
         return 0;
     }
 
+    @Override
     public MessageExt lookMessageByOffset(long commitLogOffset) {
         SelectMappedBufferResult sbr = this.commitLog.getMessage(commitLogOffset, 4);
         if (null != sbr) {
             try {
                 // 1 TOTALSIZE
                 int size = sbr.getByteBuffer().getInt();
-                return lookMessageByOffset(commitLogOffset, size);
+                return lookMessageByOffset(commitLogOffset, size);//从commitLog中通过offset和size提取message
             } finally {
                 sbr.release();
             }
@@ -800,6 +809,7 @@ public class DefaultMessageStore implements MessageStore {
         return this.commitLog.getMessage(commitLogOffset, msgSize);
     }
 
+    @Override
     public String getRunningDataInfo() {
         return this.storeStatsService.toString();
     }

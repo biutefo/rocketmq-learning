@@ -181,7 +181,7 @@ public class MessageStoreConfig {
     }
 
     public boolean isWarmMapedFileEnable() {
-        return warmMapedFileEnable;
+        return warmMapedFileEnable;//文件预热开关
     }
 
     public void setWarmMapedFileEnable(boolean warmMapedFileEnable) {

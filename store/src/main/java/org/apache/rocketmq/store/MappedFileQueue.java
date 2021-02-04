@@ -196,7 +196,7 @@ public class MappedFileQueue {
         MappedFile mappedFileLast = getLastMappedFile();
 
         if (mappedFileLast == null) {
-            createOffset = startOffset - (startOffset % this.mappedFileSize);
+            createOffset = startOffset - (startOffset % this.mappedFileSize);//整存的offset数
         }
 
         if (mappedFileLast != null && mappedFileLast.isFull()) {
@@ -240,9 +240,9 @@ public class MappedFileQueue {
     public MappedFile getLastMappedFile() {
         MappedFile mappedFileLast = null;
 
-        while (!this.mappedFiles.isEmpty()) {
+        while (!this.mappedFiles.isEmpty()) {// 循环到第一个空的mappedFiles文件
             try {
-                mappedFileLast = this.mappedFiles.get(this.mappedFiles.size() - 1);
+                mappedFileLast = this.mappedFiles.get(this.mappedFiles.size() - 1);//返回前一个文件
                 break;
             } catch (IndexOutOfBoundsException e) {
                 //continue;

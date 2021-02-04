@@ -41,6 +41,12 @@ import org.apache.rocketmq.store.config.FlushDiskType;
 import org.apache.rocketmq.store.util.LibC;
 import sun.nio.ch.DirectBuffer;
 
+/**
+ * 存储在内存中，映射实际mq的commitLog每一个存储文件，即对应00000000000000000000、00000000001073741824、00000000002147483648等文件。
+ *
+ *
+ *
+ */
 public class MappedFile extends ReferenceResource {
     public static final int OS_PAGE_SIZE = 1024 * 4;
     protected static final InternalLogger log = InternalLoggerFactory.getLogger(LoggerName.STORE_LOGGER_NAME);
@@ -127,10 +133,10 @@ public class MappedFile extends ReferenceResource {
         }
 
         ByteBuffer viewedBuffer = (ByteBuffer) invoke(buffer, methodName);
-        if (viewedBuffer == null)
+        if (viewedBuffer == null) {
             return buffer;
-        else
-            return viewed(viewedBuffer);
+        }
+        return viewed(viewedBuffer);
     }
 
     public static int getTotalMappedFiles() {
@@ -206,13 +212,18 @@ public class MappedFile extends ReferenceResource {
             ByteBuffer byteBuffer = writeBuffer != null ? writeBuffer.slice() : this.mappedByteBuffer.slice();
             byteBuffer.position(currentPos);
             AppendMessageResult result;
-            if (messageExt instanceof MessageExtBrokerInner) {
+
+            //XXX 这一块是将消息写入字节缓冲区的核心逻辑
+            /*核心写入*/
+            if (messageExt instanceof MessageExtBrokerInner) {// --------主线走这一条
                 result = cb.doAppend(this.getFileFromOffset(), byteBuffer, this.fileSize - currentPos, (MessageExtBrokerInner) messageExt);
             } else if (messageExt instanceof MessageExtBatch) {
                 result = cb.doAppend(this.getFileFromOffset(), byteBuffer, this.fileSize - currentPos, (MessageExtBatch) messageExt);
             } else {
                 return new AppendMessageResult(AppendMessageStatus.UNKNOWN_ERROR);
             }
+            /*写入*/
+
             this.wrotePosition.addAndGet(result.getWroteBytes());
             this.storeTimestamp = result.getStoreTimestamp();
             return result;

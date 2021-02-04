@@ -233,8 +233,9 @@ public class TopicConfigManager extends ConfigManager {
         final int perm,
         final int topicSysFlag) {
         TopicConfig topicConfig = this.topicConfigTable.get(topic);
-        if (topicConfig != null)
+        if (topicConfig != null) {
             return topicConfig;
+        }
 
         boolean createNew = false;
 
@@ -242,9 +243,9 @@ public class TopicConfigManager extends ConfigManager {
             if (this.lockTopicConfigTable.tryLock(LOCK_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)) {
                 try {
                     topicConfig = this.topicConfigTable.get(topic);
-                    if (topicConfig != null)
+                    if (topicConfig != null) {
                         return topicConfig;
-
+                    }
                     topicConfig = new TopicConfig(topic);
                     topicConfig.setReadQueueNums(clientDefaultTopicQueueNums);
                     topicConfig.setWriteQueueNums(clientDefaultTopicQueueNums);
@@ -273,8 +274,9 @@ public class TopicConfigManager extends ConfigManager {
 
     public TopicConfig createTopicOfTranCheckMaxTime(final int clientDefaultTopicQueueNums, final int perm) {
         TopicConfig topicConfig = this.topicConfigTable.get(TopicValidator.RMQ_SYS_TRANS_CHECK_MAX_TIME_TOPIC);
-        if (topicConfig != null)
+        if (topicConfig != null) {
             return topicConfig;
+        }
 
         boolean createNew = false;
 
@@ -282,8 +284,9 @@ public class TopicConfigManager extends ConfigManager {
             if (this.lockTopicConfigTable.tryLock(LOCK_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)) {
                 try {
                     topicConfig = this.topicConfigTable.get(TopicValidator.RMQ_SYS_TRANS_CHECK_MAX_TIME_TOPIC);
-                    if (topicConfig != null)
+                    if (topicConfig != null) {
                         return topicConfig;
+                    }
 
                     topicConfig = new TopicConfig(TopicValidator.RMQ_SYS_TRANS_CHECK_MAX_TIME_TOPIC);
                     topicConfig.setReadQueueNums(clientDefaultTopicQueueNums);

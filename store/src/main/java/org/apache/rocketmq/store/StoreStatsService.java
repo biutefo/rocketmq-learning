@@ -91,11 +91,13 @@ public class StoreStatsService extends ServiceThread {
         return putMessageEntireTimeMax;
     }
 
+    @SuppressWarnings("all")
     public void setPutMessageEntireTimeMax(long value) {
         final AtomicLong[] times = this.putMessageDistributeTime;
 
-        if (null == times)
+        if (null == times) {
             return;
+        }
 
         // us
         if (value <= 0) {

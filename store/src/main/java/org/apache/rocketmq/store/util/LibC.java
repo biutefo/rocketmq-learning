@@ -22,6 +22,9 @@ import com.sun.jna.NativeLong;
 import com.sun.jna.Platform;
 import com.sun.jna.Pointer;
 
+/**
+ *  https://linux.die.net/man/2/mlock
+ */
 public interface LibC extends Library {
     LibC INSTANCE = (LibC) Native.loadLibrary(Platform.isWindows() ? "msvcrt" : "c", LibC.class);
 
@@ -39,9 +42,9 @@ public interface LibC extends Library {
     /* synchronous memory sync */
     int MS_SYNC = 0x0004;
 
-    int mlock(Pointer var1, NativeLong var2);
+    int mlock(Pointer var1, NativeLong var2);//通过mlock可以将进程使用的部分或者全部的地址空间锁定在物理内存中，防止其被交换到swap空间。
 
-    int munlock(Pointer var1, NativeLong var2);
+    int munlock(Pointer var1, NativeLong var2);//释放内存锁定
 
     int madvise(Pointer var1, NativeLong var2, int var3);
 
