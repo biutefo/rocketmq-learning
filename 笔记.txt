@@ -8,3 +8,4 @@ RocketMQ学习笔记
 
 二、producer发送消息
 发送使用的是org.apache.rocketmq.client.producer.DefaultMQProducer.send(org.apache.rocketmq.common.message.Message)
+broker接收消息是org.apache.rocketmq.broker.processor.SendMessageProcessor.processRequest

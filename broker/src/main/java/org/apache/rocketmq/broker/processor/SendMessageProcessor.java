@@ -65,39 +65,54 @@ public class SendMessageProcessor extends AbstractSendMessageProcessor implement
         super(brokerController);
     }
 
+    /**
+     * 处理消息请求
+     * @param ctx
+     * @param request
+     * @return
+     * @throws RemotingCommandException
+     */
     @Override
     public RemotingCommand processRequest(ChannelHandlerContext ctx,
                                           RemotingCommand request) throws RemotingCommandException {
         RemotingCommand response = null;
         try {
-            response = asyncProcessRequest(ctx, request).get();
+            response = asyncProcessRequest(ctx, request).get();//同步接收消息处理->拿到future直接阻塞get
         } catch (InterruptedException | ExecutionException e) {
             log.error("process SendMessage error, request : " + request.toString(), e);
         }
         return response;
     }
 
+    /**
+     * 异步处理消息请求
+     * @param ctx
+     * @param request
+     * @param responseCallback
+     * @throws Exception
+     */
     @Override
     public void asyncProcessRequest(ChannelHandlerContext ctx, RemotingCommand request, RemotingResponseCallback responseCallback) throws Exception {
-        asyncProcessRequest(ctx, request).thenAcceptAsync(responseCallback::callback, this.brokerController.getSendMessageExecutor());
+        asyncProcessRequest(ctx, request).thenAcceptAsync(responseCallback::callback, this.brokerController.getSendMessageExecutor());//异步接收消息处理->拿到future并给出回调函数
     }
 
+    @SuppressWarnings("all")
     public CompletableFuture<RemotingCommand> asyncProcessRequest(ChannelHandlerContext ctx,
                                                                   RemotingCommand request) throws RemotingCommandException {
         final SendMessageContext mqtraceContext;
         switch (request.getCode()) {
-            case RequestCode.CONSUMER_SEND_MSG_BACK:
+            case RequestCode.CONSUMER_SEND_MSG_BACK://回发消息？
                 return this.asyncConsumerSendMsgBack(ctx, request);
             default:
                 SendMessageRequestHeader requestHeader = parseRequestHeader(request);
                 if (requestHeader == null) {
                     return CompletableFuture.completedFuture(null);
                 }
-                mqtraceContext = buildMsgContext(ctx, requestHeader);
+                mqtraceContext = buildMsgContext(ctx, requestHeader);//根据header构建context
                 this.executeSendMessageHookBefore(ctx, request, mqtraceContext);
-                if (requestHeader.isBatch()) {
+                if (requestHeader.isBatch()) {// 批量发送
                     return this.asyncSendBatchMessage(ctx, request, mqtraceContext, requestHeader);
-                } else {
+                } else {// 单条发送
                     return this.asyncSendMessage(ctx, request, mqtraceContext, requestHeader);
                 }
         }
@@ -111,8 +126,8 @@ public class SendMessageProcessor extends AbstractSendMessageProcessor implement
 
     private CompletableFuture<RemotingCommand> asyncConsumerSendMsgBack(ChannelHandlerContext ctx,
                                                                         RemotingCommand request) throws RemotingCommandException {
-        final RemotingCommand response = RemotingCommand.createResponseCommand(null);
-        final ConsumerSendMsgBackRequestHeader requestHeader =
+        final RemotingCommand response = RemotingCommand.createResponseCommand(null);//response
+        final ConsumerSendMsgBackRequestHeader requestHeader =//requestHeader
                 (ConsumerSendMsgBackRequestHeader)request.decodeCommandCustomHeader(ConsumerSendMsgBackRequestHeader.class);
         String namespace = NamespaceUtil.getNamespaceFromResource(requestHeader.getGroup());
         if (this.hasConsumeMessageHook() && !UtilAll.isBlank(requestHeader.getOriginMsgId())) {
