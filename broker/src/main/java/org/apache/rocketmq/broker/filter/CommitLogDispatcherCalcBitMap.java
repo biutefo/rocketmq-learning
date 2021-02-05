@@ -44,9 +44,13 @@ public class CommitLogDispatcherCalcBitMap implements CommitLogDispatcher {
         this.consumerFilterManager = consumerFilterManager;
     }
 
+    /**
+     * TODO：计算bitmap？？
+     * @param request
+     */
     @Override
     public void dispatch(DispatchRequest request) {
-        if (!this.brokerConfig.isEnableCalcFilterBitMap()) {
+        if (!this.brokerConfig.isEnableCalcFilterBitMap()) {//
             return;
         }
 

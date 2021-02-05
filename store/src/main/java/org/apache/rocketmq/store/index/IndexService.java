@@ -198,6 +198,10 @@ public class IndexService {
         return topic + "#" + key;
     }
 
+    /**
+     * 建立索引信息到IndexFile
+     * @param req
+     */
     public void buildIndex(DispatchRequest req) {
         IndexFile indexFile = retryGetAndCreateIndexFile();
         if (indexFile != null) {

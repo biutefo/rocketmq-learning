@@ -25,6 +25,25 @@ import org.apache.rocketmq.logging.InternalLoggerFactory;
 import org.apache.rocketmq.store.config.BrokerRole;
 import org.apache.rocketmq.store.config.StorePathConfigHelper;
 
+/**
+ * ConsumeQueue : MappedFileQueue : MappedFile = 1 : 1 : N。
+ *
+ *
+ *
+ * Yunai-MacdeMacBook-Pro-2:consumequeue yunai$ pwd
+ * /Users/yunai/store/consumequeue
+ * Yunai-MacdeMacBook-Pro-2:consumequeue yunai$ cd TopicRead3/
+ * Yunai-MacdeMacBook-Pro-2:TopicRead3 yunai$ ls -ls
+ * total 0
+ * 0 drwxr-xr-x  3 yunai  staff  102  4 27 21:52 0
+ * 0 drwxr-xr-x  3 yunai  staff  102  4 27 21:55 1
+ * 0 drwxr-xr-x  3 yunai  staff  102  4 27 21:55 2
+ * 0 drwxr-xr-x  3 yunai  staff  102  4 27 21:55 3
+ * Yunai-MacdeMacBook-Pro-2:TopicRead3 yunai$ cd 0/
+ * Yunai-MacdeMacBook-Pro-2:0 yunai$ ls -ls
+ * total 11720
+ * 11720 -rw-r--r--  1 yunai  staff  6000000  4 27 21:55 00000000000000000000
+ */
 public class ConsumeQueue {
     private static final InternalLogger log = InternalLoggerFactory.getLogger(LoggerName.STORE_LOGGER_NAME);
 
@@ -379,9 +398,11 @@ public class ConsumeQueue {
     public void putMessagePositionInfoWrapper(DispatchRequest request) {
         final int maxRetries = 30;
         boolean canWrite = this.defaultMessageStore.getRunningFlags().isCQWriteable();
+        // 多次循环写，直到成功
         for (int i = 0; i < maxRetries && canWrite; i++) {
             long tagsCode = request.getTagsCode();
-            if (isExtWriteEnable()) {
+            if (isExtWriteEnable()) {//可写
+                //TODO：啥意思
                 ConsumeQueueExt.CqExtUnit cqExtUnit = new ConsumeQueueExt.CqExtUnit();
                 cqExtUnit.setFilterBitMap(request.getBitMap());
                 cqExtUnit.setMsgStoreTime(request.getStoreTimestamp());
@@ -395,16 +416,20 @@ public class ConsumeQueue {
                         topic, queueId, request.getCommitLogOffset());
                 }
             }
+
+            // 调用添加位置信息
             boolean result = this.putMessagePositionInfo(request.getCommitLogOffset(),
                 request.getMsgSize(), tagsCode, request.getConsumeQueueOffset());
             if (result) {
                 if (this.defaultMessageStore.getMessageStoreConfig().getBrokerRole() == BrokerRole.SLAVE ||
-                    this.defaultMessageStore.getMessageStoreConfig().isEnableDLegerCommitLog()) {
+                    this.defaultMessageStore.getMessageStoreConfig().isEnableDLegerCommitLog()) {//slave节点开启enableDLegerCommitLog
+                    // 添加成功，使用消息存储时间 作为 存储check point。
                     this.defaultMessageStore.getStoreCheckpoint().setPhysicMsgTimestamp(request.getStoreTimestamp());
                 }
-                this.defaultMessageStore.getStoreCheckpoint().setLogicsMsgTimestamp(request.getStoreTimestamp());
+                this.defaultMessageStore.getStoreCheckpoint().setLogicsMsgTimestamp(request.getStoreTimestamp());//逻辑消息时间
                 return;
             } else {
+                //添加位置信息失败，sleep重试
                 // XXX: warn and notify me
                 log.warn("[BUG]put commit log position info to " + topic + ":" + queueId + " " + request.getCommitLogOffset()
                     + " failed, retry " + i + " times");
@@ -417,7 +442,7 @@ public class ConsumeQueue {
             }
         }
 
-        // XXX: warn and notify me
+        // XXX: warn and notify me 未写入成功设置异常不可写入
         log.error("[BUG]consume queue can not write, {} {}", this.topic, this.queueId);
         this.defaultMessageStore.getRunningFlags().makeLogicsQueueError();
     }
@@ -427,20 +452,25 @@ public class ConsumeQueue {
 
         if (offset + size <= this.maxPhysicOffset) {
             log.warn("Maybe try to build consume queue repeatedly maxPhysicOffset={} phyOffset={}", maxPhysicOffset, offset);
-            return true;
+            return true;// 如果已经重放过，直接返回成功
         }
 
+        // 写入位置信息到byteBuffer
         this.byteBufferIndex.flip();
         this.byteBufferIndex.limit(CQ_STORE_UNIT_SIZE);
         this.byteBufferIndex.putLong(offset);
         this.byteBufferIndex.putInt(size);
         this.byteBufferIndex.putLong(tagsCode);
 
+
+        // 计算consumeQueue存储位置，并获得对应的MappedFile
         final long expectLogicOffset = cqOffset * CQ_STORE_UNIT_SIZE;
-
         MappedFile mappedFile = this.mappedFileQueue.getLastMappedFile(expectLogicOffset);
-        if (mappedFile != null) {
 
+
+        if (mappedFile != null) {
+            // 当是ConsumeQueue是第一个MappedFile && 队列位置非第一个 && MappedFile未写入内容，则填充前置空白占位
+            // TODO 疑问：为啥这个操作。目前能够想象到的是，一些老的消息很久没发送，突然发送，这个时候刚好满足。
             if (mappedFile.isFirstCreateInQueue() && cqOffset != 0 && mappedFile.getWrotePosition() == 0) {
                 this.minLogicOffset = expectLogicOffset;
                 this.mappedFileQueue.setFlushedWhere(expectLogicOffset);
@@ -450,6 +480,7 @@ public class ConsumeQueue {
                     + mappedFile.getWrotePosition());
             }
 
+            // 校验consumeQueue存储位置是否合法。TODO 如果不合法，继续写入会不会有问题？
             if (cqOffset != 0) {
                 long currentLogicOffset = mappedFile.getWrotePosition() + mappedFile.getFileFromOffset();
 
@@ -470,12 +501,19 @@ public class ConsumeQueue {
                     );
                 }
             }
+            // 设置commitLog重放消息到ConsumeQueue位置。
             this.maxPhysicOffset = offset + size;
+            // 插入mappedFile
             return mappedFile.appendMessage(this.byteBufferIndex.array());
         }
         return false;
     }
 
+    /**
+     * 填充前置空白占位
+     * @param mappedFile MappedFile
+     * @param untilWhere consumeQueue存储位置
+     */
     private void fillPreBlank(final MappedFile mappedFile, final long untilWhere) {
         ByteBuffer byteBuffer = ByteBuffer.allocate(CQ_STORE_UNIT_SIZE);
         byteBuffer.putLong(0L);
