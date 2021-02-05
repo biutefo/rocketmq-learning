@@ -57,6 +57,12 @@ public class ExpressionMessageFilter implements MessageFilter {
         }
     }
 
+    /**
+     * 根据tag或者布隆过滤器过滤消息
+     * @param tagsCode tagsCode
+     * @param cqExtUnit extend unit of consume queue
+     * @return
+     */
     @Override
     public boolean isMatchedByConsumeQueue(Long tagsCode, ConsumeQueueExt.CqExtUnit cqExtUnit) {
         if (null == subscriptionData) {

@@ -27,26 +27,36 @@ import org.apache.rocketmq.remoting.exception.RemotingCommandException;
 
 public class PullMessageRequestHeader implements CommandCustomHeader {
     @CFNotNull
-    private String consumerGroup;
+    private String consumerGroup;// 消费者组
     @CFNotNull
-    private String topic;
+    private String topic;// topic
     @CFNotNull
-    private Integer queueId;
+    private Integer queueId;// queueId
     @CFNotNull
-    private Long queueOffset;
+    private Long queueOffset;// 队列的位点
     @CFNotNull
-    private Integer maxMsgNums;
+    private Integer maxMsgNums;// 消息数量
+
+    /**
+     * 第 0 位 FLAG_COMMIT_OFFSET ：标记请求提交消费进度位置，和 commitOffset 配合。
+     * 第 1 位 FLAG_SUSPEND ：标记请求是否挂起请求，和 suspendTimeoutMillis 配合。当拉取不到消息时， Broker 会挂起请求，直到有消息。最大挂起时间：suspendTimeoutMillis 毫秒。
+     * 第 2 位 FLAG_SUBSCRIPTION ：是否过滤订阅表达式，和 subscription 配置。
+     */
     @CFNotNull
-    private Integer sysFlag;
+    private Integer sysFlag;// 系统标识
     @CFNotNull
-    private Long commitOffset;
+    private Long commitOffset;// 提交消费进度位点
     @CFNotNull
-    private Long suspendTimeoutMillis;
+    private Long suspendTimeoutMillis;// 挂起超时时间
     @CFNullable
-    private String subscription;
+    private String subscription;// 订阅表达式
+
+    /**
+     * 订阅版本号。请求时，如果版本号不对，则无法拉取到消息，需要重新获取订阅信息，使用最新的订阅版本号。
+     */
     @CFNotNull
-    private Long subVersion;
-    private String expressionType;
+    private Long subVersion;//订阅版本号
+    private String expressionType;// ?
 
     @Override
     public void checkFields() throws RemotingCommandException {

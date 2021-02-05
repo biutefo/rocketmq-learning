@@ -118,6 +118,14 @@ public class ConsumerOffsetManager extends ConfigManager {
         return groups;
     }
 
+    /**
+     * 提交消费进度
+     * @param clientHost
+     * @param group
+     * @param topic
+     * @param queueId
+     * @param offset
+     */
     public void commitOffset(final String clientHost, final String group, final String topic, final int queueId,
         final long offset) {
         // topic@group
@@ -152,6 +160,7 @@ public class ConsumerOffsetManager extends ConfigManager {
         return -1;
     }
 
+    @Override
     public String encode() {
         return this.encode(false);
     }
@@ -171,6 +180,7 @@ public class ConsumerOffsetManager extends ConfigManager {
         }
     }
 
+    @Override
     public String encode(final boolean prettyFormat) {
         return RemotingSerializable.toJson(this, prettyFormat);
     }

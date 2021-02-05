@@ -134,6 +134,12 @@ public class MixAll {
         return 0;
     }
 
+    /**
+     * 将内容写到文件 1.写到.tmp 2.备份准备写入文件到.bak文件 3.删除原文件，将.tmp改为原文件
+     * @param str
+     * @param fileName
+     * @throws IOException
+     */
     public static void string2File(final String str, final String fileName) throws IOException {
 
         String tmpFile = fileName + ".tmp";
