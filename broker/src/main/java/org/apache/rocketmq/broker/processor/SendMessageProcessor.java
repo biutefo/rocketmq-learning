@@ -218,7 +218,7 @@ public class SendMessageProcessor extends AbstractSendMessageProcessor implement
 
         int maxReconsumeTimes = subscriptionGroupConfig.getRetryMaxTimes();//最大重新消费次数
         if (request.getVersion() >= MQVersion.Version.V3_4_9.ordinal()) {
-            maxReconsumeTimes = requestHeader.getMaxReconsumeTimes();//3.4.9版本只会最大重试次数配置改为requestHeader.maxReconsumeTimes
+            maxReconsumeTimes = requestHeader.getMaxReconsumeTimes();//3.4.9版本只会最大重试次数配置改为从请求参数中取，为可配置
         }
 
         if (msgExt.getReconsumeTimes() >= maxReconsumeTimes

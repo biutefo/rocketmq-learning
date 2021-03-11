@@ -2030,11 +2030,15 @@ public class DefaultMessageStore implements MessageStore {
 
                             if (dispatchRequest.isSuccess()) {// 读取成功
                                 if (size > 0) {// 读取Message
+
+                                    /*核心逻辑，建立消息位置信息到ConsumeQueue + 建立索引信息到IndexFile*/
                                     DefaultMessageStore.this.doDispatch(dispatchRequest);
+                                    /*核心逻辑，建立消息位置信息到ConsumeQueue + 建立索引信息到IndexFile*/
 
                                     // 通知有新消息
                                     if (BrokerRole.SLAVE != DefaultMessageStore.this.getMessageStoreConfig().getBrokerRole()
                                         && DefaultMessageStore.this.brokerConfig.isLongPollingEnable()) {
+                                        //当 Broker 是主节点 && Broker 开启的是长轮询，通知消费队列有新的消息。NotifyMessageArrivingListener 会 调用 PullRequestHoldService#notifyMessageArriving(...) 方法
                                         DefaultMessageStore.this.messageArrivingListener.arriving(dispatchRequest.getTopic(),
                                             dispatchRequest.getQueueId(), dispatchRequest.getConsumeQueueOffset() + 1,
                                             dispatchRequest.getTagsCode(), dispatchRequest.getStoreTimestamp(),
